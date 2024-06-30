@@ -1,0 +1,13 @@
+<svg width="1000" height="500" viewBox="0 0 1000 500" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer Walls -->
+  <rect x="0" y="0" width="1000" height="2" fill="gray" /> <!-- Top Wall -->
+  <rect x="0" y="0" width="2" height="500" fill="gray" /> <!-- Left Wall -->
+  <rect x="998" y="0" width="2" height="500" fill="gray" /> <!-- Right Wall -->
+  <rect x="0" y="498" width="1000" height="2" fill="gray" /> <!-- Bottom Wall -->
+
+  <!-- Example Rooms -->
+  <rect x="20" y="20" width="100" height="100" class="room" id="room1" />
+  <rect x="140" y="20" width="100" height="100" class="room" id="room2" />
+  <rect x="260" y="20" width="100" height="100" class="room" id="room3" />
+  <rect x="380" y="20" width="100" height="100" class="room" id="room4" />
+</svg>

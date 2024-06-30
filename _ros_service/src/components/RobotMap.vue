@@ -1,122 +1,9 @@
-# _ros_web_service
-
-API 엔드포인트</br>
-/set_pose/: 초기 포즈를 설정합니다.</br>
-
-HTTP 메소드: POST</br>
-Body 형식:</br>
-json</br>
-```
-{
-    "x": float,
-    "y": float,
-    "theta": float  // 각도(degrees)
-}
-```
-/set_nav_goal/: 네비게이션 목표 지점을 설정합니다.</br>
-HTTP 메소드: POST</br>
-Body 형식:</br>
-json</br>
-```
-{
-    "x": float,
-    "y": float,
-    "theta": float  // 각도(degrees)
-}
-```
-/set_walls/: 장애물을 설정합니다.</br>
-HTTP 메소드: POST</br>
-Body 형식:</br>
-json</br>
-```
-[
-    {
-        "x1": float,
-        "y1": float,
-        "x2": float,
-        "y2": float
-    },
-    ...
-]
-```
-/clear_walls/: 장애물을 초기화합니다.</br>
-HTTP 메소드: POST</br>
-</br>
-/get_sim_pose: 시뮬레이션 로봇의 위치를 조회합니다.</br>
-HTTP 메소드: GET</br>
-</br>
-/map_info: 맵 정보를 조회합니다.</br>
-HTTP 메소드: GET</br>
-</br>
-/map_image: 맵 이미지를 조회합니다.</br>
-HTTP 메소드: GET</br>
-
-WebSocket 엔드포인트</br>
-/ws/robot_data: 로봇의 위치와 속도 데이터를 실시간으로 전달합니다.</br>
-형식: JSON</br>
-보내는 데이터 예시:</br>
-json</br>
-```
-{
-    "pose": {
-        "x": float,
-        "y": float,
-        "z": float,
-        "orientation": {
-            "x": float,
-            "y": float,
-            "z": float,
-            "w": float
-        }
-    },
-    "velocity": {
-        "linear": {
-            "x": float,
-            "y": float,
-            "z": float
-        },
-        "angular": {
-            "x": float,
-            "y": float,
-            "z": float
-        }
-    }
-}
-```
-/ws/notify: 알림을 실시간으로 전달합니다.</br>
-현재는 주기적으로 연결을 유지하는 용도로 사용됩니다.</br>
-</br>
-좌표 변환 공식</br>
-SVG 좌표 -> 실제 좌표 변환:</br>
-</br>
-worldX = ((mapWidth - svgP.x) * resolution) + originX</br>
-worldY = (svgP.y * resolution) + originY</br>
-실제 좌표 -> SVG 좌표 변환:</br>
-</br>
-imageX = (-worldX - originX) / resolution</br>
-imageY = mapHeight - ((-worldY - originY) / resolution)</br>
-주요 API 및 WebSocket 구성</br>
-API 엔드포인트:</br>
-</br>
-/set_pose: 초기 포즈 설정</br>
-/set_nav_goal: 네비게이션 목표 설정</br>
-/set_walls: 장애물 벽 설정</br>
-/clear_walls: 모든 장애물 벽 초기화</br>
-/map_info: 맵 정보 조회</br>
-/map_image: 맵 이미지 조회</br>
-WebSocket:</br>
-</br>
-ws://localhost:8000/ws/robot_data: 로봇 데이터 실시간 수신</br>
-ws://localhost:8000/ws/notify: 알림 실시간 수신</br>
-코드code review_vue.js</br>
-```
 <template>
   <div id="app">
     <header>
       <h1>agv robot controller</h1>
     </header>
     <div class="toolbar">
-      <!-- 모드 변경 버튼 -->
       <button @click="setMode('navigation')" :class="{ active: mode === 'navigation' }">Navigation Mode</button>
       <button @click="setMode('wall')" :class="{ active: mode === 'wall' }">Wall Mode</button>
     </div>
@@ -241,13 +128,13 @@ import axios from 'axios';
 export default {
   data() {
     return {
-      mapImage: '',  // 맵 이미지 URL
-      robotPose: null,  // 로봇의 현재 위치
-      resolution: 0,  // 맵 해상도
-      originX: 0,  // 맵의 X 원점
-      originY: 0,  // 맵의 Y 원점
-      mapWidth: 0,  // 맵의 너비
-      mapHeight: 0,  // 맵의 높이
+      mapImage: '',
+      robotPose: null,
+      resolution: 0,
+      originX: 0,
+      originY: 0,
+      mapWidth: 0,
+      mapHeight: 0,
       velocity: {
         linear: { x: 0 },
         angular: { z: 0 }
@@ -264,15 +151,14 @@ export default {
       },
       socket: null,
       notificationSocket: null,
-      reconnectInterval: 5000,  // WebSocket 재연결 간격
-      isDrawing: false,  // 드로잉 상태
+      reconnectInterval: 5000,
+      isDrawing: false,
       currentLine: { x1: 0, y1: 0, x2: 0, y2: 0 },
       lines: [],
-      mode: 'navigation'  // 현재 모드
+      mode: 'navigation'  // 모드 추가
     };
   },
   computed: {
-    // 로봇 마커의 X 좌표
     robotMarkerX() {
       if (!this.robotPose) return 0.0
 
@@ -283,7 +169,6 @@ export default {
       const imageX = worldX / this.resolution
       return parseFloat(imageX.toFixed(5))
     },
-    // 로봇 마커의 Y 좌표
     robotMarkerY() {
       if (!this.robotPose) return 0.0
 
@@ -294,7 +179,6 @@ export default {
       const imageY = this.mapHeight - (worldY / this.resolution)
       return parseFloat(imageY.toFixed(5))
     },
-    // 네비게이션 목표 마커의 X 좌표
     navGoalMarkerX() {
       if (!this.navGoal) return 0.0
 
@@ -305,7 +189,6 @@ export default {
       const imageX = worldX / this.resolution
       return parseFloat(imageX.toFixed(5))
     },
-    // 네비게이션 목표 마커의 Y 좌표
     navGoalMarkerY() {
       if (!this.navGoal) return 0.0
 
@@ -318,24 +201,22 @@ export default {
     }
   },
   async created() {
-    await this.fetchMapInfo()  // 맵 정보 가져오기
-    this.connectWebSocket()  // 로봇 데이터 WebSocket 연결
-    this.connectNotificationWebSocket()  // 알림 WebSocket 연결
+    await this.fetchMapInfo()
+    this.connectWebSocket()
+    this.connectNotificationWebSocket() // 알림을 위한 웹소켓 연결
   },
   beforeUnmount() {
     if (this.socket) {
-      this.socket.close()  // 컴포넌트 언마운트 시 WebSocket 닫기
+      this.socket.close()
     }
     if (this.notificationSocket) {
       this.notificationSocket.close()
     }
   },
   methods: {
-    // 모드 변경
     setMode(newMode) {
       this.mode = newMode
     },
-    // 맵 정보 가져오기
     async fetchMapInfo() {
       try {
         const response = await axios.get('http://localhost:8000/map_info')
@@ -352,7 +233,6 @@ export default {
         console.error('Error fetching map info:', error)
       }
     },
-    // 로봇 데이터 WebSocket 연결
     connectWebSocket() {
       this.socket = new WebSocket('ws://localhost:8000/ws/robot_data')
 
@@ -391,7 +271,6 @@ export default {
         this.socket.close()
       }
     },
-    // 알림 WebSocket 연결
     connectNotificationWebSocket() {
       this.notificationSocket = new WebSocket('ws://localhost:8000/ws/notify')
 
@@ -400,7 +279,7 @@ export default {
       }
 
       this.notificationSocket.onmessage = (event) => {
-        alert(event.data)  // 서버에서 받은 메시지를 alert로 표시
+        alert(event.data) // 서버에서 받은 메시지를 alert로 표시
       }
 
       this.notificationSocket.onclose = () => {
@@ -413,7 +292,6 @@ export default {
         this.notificationSocket.close()
       }
     },
-    // 드로잉 시작
     startDrawing(event) {
       if (this.mode !== 'wall') return
 
@@ -429,7 +307,6 @@ export default {
       this.currentLine.y2 = svgP.y;
       this.isDrawing = true;
     },
-    // 드로잉 중
     drawLine(event) {
       if (!this.isDrawing) return;
 
@@ -442,7 +319,6 @@ export default {
       this.currentLine.x2 = svgP.x;
       this.currentLine.y2 = svgP.y;
     },
-    // 드로잉 종료
     endDrawing() {
       if (!this.isDrawing) return
 
@@ -450,7 +326,6 @@ export default {
       this.lines.push({ ...this.currentLine });
       this.currentLine = { x1: 0, y1: 0, x2: 0, y2: 0 };
     },
-    // 네비게이션 목표 설정
     setNavGoalByClick(event) {
       if (this.mode !== 'navigation') return
 
@@ -481,7 +356,6 @@ export default {
       // 변환된 좌표를 콘솔에 출력합니다.
       console.log(`Mapped coordinates: x=${this.navGoal.x}, y=${this.navGoal.y}`);
     },
-    // SVG 좌표를 실제 로봇 좌표로 변환
     convertToRobotCoords(line) {
       const worldX1 = ((this.mapWidth - line.x1) * this.resolution) + this.originX;
       const worldY1 = (line.y1 * this.resolution) + this.originY;
@@ -494,7 +368,6 @@ export default {
         y2: parseFloat(worldY2.toFixed(5))
       };
     },
-    // 초기 포즈 설정 API 호출
     async setPose() {
       try {
         await axios.post('http://localhost:8000/set_pose', this.pose)
@@ -504,7 +377,6 @@ export default {
         alert('Failed to set pose')
       }
     },
-    // 네비게이션 목표 설정 API 호출
     async setNavGoal() {
       try {
         await axios.post('http://localhost:8000/set_nav_goal', this.navGoal)
@@ -514,23 +386,22 @@ export default {
         alert('Failed to set navigation goal')
       }
     },
-    // 장애물 벽 설정 API 호출
     async submitLines() {
       const lines = this.lines.map(line => this.convertToRobotCoords(line));
       console.log(lines.length)
-      if (lines.length > 0) {
-        try {
-          await axios.post('http://localhost:8000/set_walls', lines);
-          alert(`Number of walls set: ${this.lines.length}`);
-        } catch (error) {
-          console.error(error);
-          alert('Failed to set walls');
-        }
-      } else {
-        alert("Set obstacles first")
+      if(lines.length > 0){
+      try {
+        await axios.post('http://localhost:8000/set_walls', lines);
+        alert(`Number of walls set: ${this.lines.length}`);
+      } catch (error) {
+        console.error(error);
+        alert('Failed to set walls');
       }
+    }
+    else {
+      alert("Set obstacles first")
+    }
     },
-    // 모든 장애물 벽 제거 API 호출
     async removeAllLines() {
       try {
         await axios.post('http://localhost:8000/clear_walls');
@@ -619,4 +490,3 @@ button {
   margin-bottom: 10px;
 }
 </style>
-```
