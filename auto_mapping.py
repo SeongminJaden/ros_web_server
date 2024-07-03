@@ -12,20 +12,26 @@ class AutoMappingNode(Node):
         self.publisher_ = self.create_publisher(Twist, 'cmd_vel', 10)
         self.timer = self.create_timer(0.1, self.move_callback)
         self.mapping_process = None
+        self.navigation_process = None
         self.start_time = None
-        self.duration = 180  # 3 minutes
+        self.duration = 30  # 3 minutes
         self.last_change_time = None
-        self.change_interval = 30  # Change direction every 30 seconds
+        self.change_interval = 5  # Change direction every 30 seconds
         self.initial_position = None
         self.path = []
+        self.mapping_started = False
+        self.mapping_completed = False
 
     def start_mapping(self):
         # Set up the ROS 2 environment
-        os.system('source ~/cartoros2/install/setup.bash')
-        
-        # Start the mapping launch file
-        self.mapping_process = subprocess.Popen(['ros2', 'launch', 'yahboom_bringup', 'Mapping_bring.launch.py'], env=os.environ)
+        setup_script = os.path.expanduser('~/cartoros2/install/setup.bash')
+        command = f'source {setup_script} && ros2 launch yahboom_bringup Mapping_bring.launch.py'
+        self.mapping_process = subprocess.Popen(command, shell=True, executable='/bin/bash')
         self.get_logger().info('Mapping started.')
+        time.sleep(15)  # Wait for 15 seconds to let mapping node initialize
+        self.mapping_started = True
+        self.start_time = time.time()
+        self.last_change_time = self.start_time
 
     def stop_mapping(self):
         if self.mapping_process:
@@ -34,7 +40,7 @@ class AutoMappingNode(Node):
             self.get_logger().info('Mapping process stopped.')
 
     def move_callback(self):
-        if self.start_time is None:
+        if not self.mapping_started:
             return  # Wait for the mapping to start
 
         current_time = time.time()
@@ -49,14 +55,16 @@ class AutoMappingNode(Node):
                 twist.linear.x = 0.5
                 twist.angular.z = 0.3
             self.publisher_.publish(twist)
-        else:
+        elif not self.mapping_completed:
             twist = Twist()
             twist.linear.x = 0.0
             twist.angular.z = 0.0
             self.publisher_.publish(twist)
             self.save_map()
-            self.return_to_start()
+            self.mapping_completed = True
+            time.sleep(15)  # Wait for 15 seconds before stopping mapping and starting navigation
             self.stop_mapping()
+            self.start_navigation()
             rclpy.shutdown()
 
     def save_map(self):
@@ -64,9 +72,9 @@ class AutoMappingNode(Node):
         # Finish trajectory
         subprocess.run(['ros2', 'service', 'call', '/finish_trajectory', 'cartographer_ros_msgs/srv/FinishTrajectory', '{trajectory_id: 0}'])
         # Write state
-        subprocess.run(['ros2', 'service', 'call', '/write_state', 'cartographer_ros_msgs/srv/WriteState', '{filename: "/home/yahboom/cartoros2/data/maps/mymap.pbstream"}'])
+        subprocess.run(['ros2', 'service', 'call', '/write_state', 'cartographer_ros_msgs/srv/WriteState', '{filename: "/home/yahboom/mymap.pbstream"}'])
         # Convert to ROS map
-        subprocess.run(['ros2', 'run', 'cartographer_ros', 'pbstream_to_ros_map_node', '-map_filestem=/home/yahboom/cartoros2/data/maps/mymap', '-pbstream_filename=/home/yahboom/cartoros2/data/maps/mymap.pbstream', '-resolution=0.05'])
+        subprocess.run(['ros2', 'run', 'cartographer_ros', 'pbstream_to_ros_map_node', '-map_filestem=/home/yahboom/mymap', '-pbstream_filename=/home/yahboom/mymap.pbstream', '-resolution=0.05'])
         self.get_logger().info('Map saved successfully')
 
     def return_to_start(self):
@@ -74,18 +82,19 @@ class AutoMappingNode(Node):
         # In the absence of actual odom data, this example simply stops the robot.
         # You can implement a more sophisticated return mechanism using other sensors or pre-defined paths.
 
+    def start_navigation(self):
+        # Set up the ROS 2 environment
+        setup_script = os.path.expanduser('~/cartoros2/install/setup.bash')
+        command = f'source {setup_script} && ros2 launch yahboom_bringup Navigation_bringup.launch.py map_yaml:=/home/yahboom/mymap.yaml map:=/home/yahboom/mymap.pbstream'
+        self.navigation_process = subprocess.Popen(command, shell=True, executable='/bin/bash')
+        self.get_logger().info('Navigation started.')
+
 def main(args=None):
     rclpy.init(args=args)
     node = AutoMappingNode()
     
     # Start the mapping process before spinning the node
     node.start_mapping()
-    node.get_logger().info('Waiting for 5 seconds to let mapping node initialize...')
-    time.sleep(5)  # Wait for the mapping node to initialize
-    
-    node.start_time = time.time()
-    node.last_change_time = node.start_time
-    node.get_logger().info('Starting to move the robot for mapping...')
     
     rclpy.spin(node)
     node.destroy_node()
